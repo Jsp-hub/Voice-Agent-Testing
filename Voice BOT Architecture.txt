@@ -1,0 +1,38 @@
+Voice BOT rchitecture
+
+[User Audio] ➔ (1. Speech-to-Text) ➔ [Text] ➔ (2. LLM / Brain) ➔ [Text] ➔ (3. Text-to-Speech) ➔ [Bot Audio]
+
+
+
+
+edge cases - Accent, completely out of context, How agent handle phone on hold (no incoming traffic), How agent intercept spam (DDOS) Calls (their rivals may do this), 
+
+
+
+
+
+
+1. Repeated failure to locate the patient record after successful identity verification
+2. Every failed lookup leads to a dead-end transfer, leaving the user's task unresolved
+3. Phone-number value corrupted when read back during identity confirmation
+4. Garbled / non-sequitur utterances near failed transfers
+5. Patient name corrupted during identity read-back, then falsely confirmed correct
+6. Insurer name substituted/hallucinated in a later turn
+7. Practice identifies itself with two different names within the same call
+
+
+
+
+
+
+does it reveals other people's appointment
+
+SMS consent and read-back	Ask for confirmation by text, then correct the phone number or decline text messages.	Text is claimed without consent, sent to stale data, or confirmation content differs from voice confirmation.
+General-information privacy boundary	A new caller asks only for address, hours, accepted insurance, parking, or referral rules—and refuses to provide DOB.	The agent unnecessarily demands identity verification for non-personal information. The insurance transcripts hint at this problem already.
+
+
+Safety triage versus scheduling  - checks priority
+Unsupported-request honesty
+Calendar edge cases  - public holidays
+Language / IVR path
+Natural human friction

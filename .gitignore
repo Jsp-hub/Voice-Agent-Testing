@@ -1,0 +1,23 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Generated call artifacts (keep the folder layout, not recordings or patient data)
+artifacts/audio/*
+!artifacts/audio/.gitkeep
+artifacts/transcripts/*
+!artifacts/transcripts/.gitkeep
+artifacts/reports/*
+!artifacts/reports/.gitkeep
+
+# Test output
+.pytest_cache/
+.coverage
+htmlcov/
