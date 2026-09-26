@@ -4,7 +4,7 @@ An automated, pipeline-mode LiveKit patient simulator for testing the authorized
 
 The runtime keeps its speech-to-text, text-LLM, and text-to-speech adapters as separate components. The agent layer only orchestrates those components and the LiveKit session.
 
-This project is being built incrementally. Setup and run instructions will be added as each component is implemented.
+This project is being built incrementally.
 # Voice-BOT Assessment Simulator
 
 ## First LLM rehearsal
@@ -35,8 +35,7 @@ the simulated patient's next reply. Type `/quit` to stop.
 ## Voice-only LiveKit rehearsal
 
 This milestone uses a separate pipeline with Deepgram STT, Gemini LLM, and xAI
-TTS. It has no Telnyx number, SIP trunk identifier, or destination number, so it
-cannot place a phone call.
+TTS. The browser rehearsal itself does not place a phone call.
 
 1. Add `LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`, and
    `DEEPGRAM_API_KEY` to your local `.env` file.
@@ -55,3 +54,21 @@ cannot place a phone call.
 The voice agent opens as the patient, streams each Gemini response to xAI TTS,
 and closes the private room after five minutes or 20 final user turns. Stop it
 with `Ctrl+C` at any time.
+
+## Outbound assessment call
+
+Add `LIVEKIT_OUTBOUND_TRUNK_ID` and `TELNYX_CALLER_NUMBER` to `.env`.
+
+Dry-run only (no call):
+
+```powershell
+python -m scripts.prepare_outbound_call
+```
+
+To place one real, authorized assessment call—while the voice worker is running:
+
+```powershell
+python -m scripts.dial_assessment --dial --confirm-authorized-test-call
+```
+
+The dial command is hard-locked to `+1-805-439-8008`.
