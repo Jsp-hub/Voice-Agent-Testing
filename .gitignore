@@ -8,7 +8,7 @@ __pycache__/
 *.py[cod]
 .venv/
 venv/
-
+virenvironment/
 # Generated call artifacts (keep the folder layout, not recordings or patient data)
 artifacts/audio/*
 !artifacts/audio/.gitkeep

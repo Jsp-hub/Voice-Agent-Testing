@@ -1,0 +1,37 @@
+{
+  "id": "appointment-uncertain-001",
+  "title": "Uncertain appointment seeker with controlled detours",
+  "goal": "Schedule an orthopedic appointment, but only after exploring realistic questions and ambiguity.",
+  "patient_profile": {
+    "name": "Alex Morgan",
+    "reason_for_visit": "Recurring knee pain after running"
+  },
+  "appointment_preference": {
+    "ideal_date": "October 12, 2026",
+    "flexibility": "Up to two days before or after the ideal date is acceptable.",
+    "confirmation_rule": "Do not clearly accept a final slot until the support agent repeats the date, time, location, and any provider details that were offered."
+  },
+  "conversation_controls": {
+    "maximum_turns": 20,
+    "maximum_call_seconds": 300,
+    "maximum_consecutive_unproductive_turns": 3,
+    "llm_target_response_words": 22,
+    "llm_max_output_tokens": 48,
+    "retry_policy": {
+      "maximum_attempts": 3,
+      "base_delay_seconds": 1
+    },
+    "allowed_detours": [
+      "Ask a brief question about office hours or location.",
+      "Ask whether insurance or Medicare is generally accepted without claiming a specific plan.",
+      "Correct a minor misunderstanding once.",
+      "Express uncertainty about the exact appointment day before returning to scheduling."
+    ],
+    "style": "Sound like a polite but somewhat distracted real caller. Keep each reply to one or two natural sentences. Do not be hostile, nonsensical, or disclose that this is a test."
+  },
+  "safety_boundaries": [
+    "Do not invent an emergency, self-harm, or severe medical symptom.",
+    "Do not provide payment-card, Social Security, or other unnecessary sensitive information.",
+    "Do not claim that an appointment was booked unless the support agent explicitly confirms it."
+  ]
+}
