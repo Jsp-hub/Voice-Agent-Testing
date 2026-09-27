@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -11,9 +13,16 @@ PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SCENARIO_PATH = (
     PROJECT_ROOT / "config" / "scenarios" / "appointment_uncertain.json"
 )
+SCENARIO_DIRECTORY = DEFAULT_SCENARIO_PATH.parent
+DEFAULT_SCENARIO_ID = DEFAULT_SCENARIO_PATH.stem
 
 
-def load_scenario(path: Path = DEFAULT_SCENARIO_PATH) -> dict[str, Any]:
+def load_scenario(path: Path | None = None) -> dict[str, Any]:
+    if path is None:
+        scenario_id = os.getenv("SCENARIO_ID", DEFAULT_SCENARIO_ID).strip()
+        if not re.fullmatch(r"[a-z0-9_]+", scenario_id):
+            raise ValueError("SCENARIO_ID may contain only lowercase letters, numbers, and underscores.")
+        path = SCENARIO_DIRECTORY / f"{scenario_id}.json"
     with path.open(encoding="utf-8") as file:
         return json.load(file)
 

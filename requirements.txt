@@ -1,2 +1,3 @@
 livekit-agents[deepgram,google,silero]~=1.8
 python-dotenv>=1.0,<2
+av>=14,<16

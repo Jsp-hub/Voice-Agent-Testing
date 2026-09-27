@@ -8,7 +8,9 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import json
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from livekit import api
@@ -18,8 +20,11 @@ from src.telephony.outbound_call import (
     build_authorized_call_request,
     require_authorized_dial_confirmation,
 )
+from src.storage.call_artifacts import CallArtifact, now_iso
+from src.storage.room_recorder import RoomRecorder
 
 AGENT_NAME = "patient-simulator-rehearsal"
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 async def dial() -> None:
@@ -28,17 +33,39 @@ async def dial() -> None:
         room_name=room_name,
         destination=AUTHORIZED_TEST_NUMBER,
     )
+    artifact = CallArtifact.create(
+        PROJECT_ROOT / "artifacts",
+        {
+            "call_type": "authorized_assessment",
+            "room_name": room_name,
+            "scenario": "appointment_uncertain",
+            "authorized_destination": AUTHORIZED_TEST_NUMBER,
+            "recording_channels": {
+                "left": "support_agent",
+                "right": "patient_bot",
+            },
+        },
+    )
+    recorder = RoomRecorder(room_name=room_name, output_path=artifact.recording_path)
     livekit_api = api.LiveKitAPI()
+    recorder_started = False
 
     try:
         dispatch = await livekit_api.agent_dispatch.create_dispatch(
             api.CreateAgentDispatchRequest(
                 agent_name=AGENT_NAME,
                 room=room_name,
-                metadata='{"call_type":"authorized_assessment"}',
+                metadata=json.dumps(
+                    {
+                        "call_type": "authorized_assessment",
+                        "artifact_directory": str(artifact.directory),
+                    }
+                ),
             )
         )
         print(f"Agent dispatched: {dispatch.id}")
+        await recorder.start()
+        recorder_started = True
         print(f"Dialing the authorized assessment number in room: {room_name}")
 
         participant = await livekit_api.sip.create_sip_participant(
@@ -52,7 +79,11 @@ async def dial() -> None:
             )
         )
         print(f"Call answered; SIP participant joined: {participant.participant_id}")
+        await recorder.wait_until_finished()
     finally:
+        if recorder_started:
+            await recorder.close()
+        artifact.update_metadata(dialer_finished_at=now_iso())
         await livekit_api.aclose()
 
 

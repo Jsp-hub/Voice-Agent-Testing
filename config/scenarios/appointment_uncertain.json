@@ -3,7 +3,7 @@
   "title": "Uncertain appointment seeker with controlled detours",
   "goal": "Schedule an orthopedic appointment, but only after exploring realistic questions and ambiguity.",
   "patient_profile": {
-    "name": "Alex Morgan",
+    "name": "Jeel Patel",
     "reason_for_visit": "Recurring knee pain after running"
   },
   "appointment_preference": {

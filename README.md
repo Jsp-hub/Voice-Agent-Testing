@@ -72,3 +72,12 @@ python -m scripts.dial_assessment --dial --confirm-authorized-test-call
 ```
 
 The dial command is hard-locked to `+1-805-439-8008`.
+
+On phone calls, the bot waits for the clinic greeting before replying; after
+eight seconds of silence, it uses a brief fallback greeting. TTS uses Rex at
+1.5x speed. Select a scenario with `SCENARIO_ID` in `.env`; the default is
+`appointment_uncertain` and the new safety test is `triage_before_scheduling`.
+
+Each real call creates `artifacts/Transcript_###/` with a clean `transcript.txt`,
+a stereo `recording.mp3`, and `metadata.json`. Set `SAVE_DEBUG_LOGS=true` in
+`.env` only when you also need raw diagnostic logs.

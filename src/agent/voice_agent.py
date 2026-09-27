@@ -7,6 +7,7 @@ It can be tested only in a LiveKit room until outbound telephony is added later.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 from pathlib import Path
@@ -20,10 +21,12 @@ from livekit.agents import (
     TurnHandlingOptions,
     cli,
     inference,
+    room_io,
 )
 from livekit.plugins import deepgram, google, silero
 
 from src.scenarios.prompting import build_instructions, load_scenario
+from src.storage.call_artifacts import CallArtifact, DebugLogCapture, now_iso
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -67,6 +70,26 @@ async def entrypoint(ctx: JobContext) -> None:
     required_environment("LIVEKIT_API_KEY")
     required_environment("LIVEKIT_API_SECRET")
 
+    try:
+        dispatch_metadata = json.loads(ctx.job.metadata or "{}")
+    except json.JSONDecodeError:
+        dispatch_metadata = {}
+
+    artifact: CallArtifact | None = None
+    debug_capture: DebugLogCapture | None = None
+    artifact_directory = dispatch_metadata.get("artifact_directory")
+    if artifact_directory:
+        artifact = CallArtifact.open(artifact_directory)
+        artifact.update_metadata(
+            room_name=ctx.room.name,
+            agent_name="patient-simulator-rehearsal",
+            status="in_progress",
+        )
+        debug_capture = DebugLogCapture(
+            artifact,
+            enabled=os.getenv("SAVE_DEBUG_LOGS", "false").strip().lower() == "true",
+        )
+
     scenario = load_scenario()
     controls = scenario["conversation_controls"]
     session = AgentSession(
@@ -82,8 +105,9 @@ async def entrypoint(ctx: JobContext) -> None:
         ),
         tts=inference.TTS(
             model=os.getenv("XAI_TTS_MODEL", "xai/tts-1"),
-            voice=os.getenv("XAI_TTS_VOICE", "ara"),
+            voice="rex",
             language="en",
+            extra_kwargs={"speed": 1.5},
         ),
         vad=silero.VAD.load(),
         turn_handling=TurnHandlingOptions(
@@ -111,13 +135,16 @@ async def entrypoint(ctx: JobContext) -> None:
         ),
     )
 
-    state = {"turns": 0, "ending": False}
+    state = {"turns": 0, "ending": False, "last_user_turn_at": None}
+    finished = asyncio.Event()
+    first_support_turn = asyncio.Event()
 
     async def end_rehearsal(message: str) -> None:
         if state["ending"]:
             return
         state["ending"] = True
         await graceful_finish(ctx, session, message)
+        finished.set()
 
     @session.on("user_input_transcribed")
     def on_user_input_transcribed(event) -> None:
@@ -125,26 +152,83 @@ async def entrypoint(ctx: JobContext) -> None:
             return
 
         state["turns"] += 1
+        state["last_user_turn_at"] = asyncio.get_running_loop().time()
+        first_support_turn.set()
         if state["turns"] >= controls["maximum_turns"]:
             asyncio.create_task(
                 end_rehearsal("Thank you for your help. I need to go now. Goodbye.")
             )
 
-    await session.start(agent=PatientSimulator(), room=ctx.room)
+    @session.on("conversation_item_added")
+    def on_conversation_item_added(event) -> None:
+        if artifact is None:
+            return
+        item = event.item
+        role = getattr(item, "role", None)
+        text = getattr(item, "raw_text_content", "")
+        if role not in {"user", "assistant"} or not text:
+            return
+
+        artifact.append_transcript(
+            speaker="Support agent" if role == "user" else "Patient bot",
+            text=text,
+            interrupted=bool(getattr(item, "interrupted", False)),
+        )
+        if role == "assistant" and state["last_user_turn_at"] is not None:
+            latency_ms = round(
+                (asyncio.get_running_loop().time() - state["last_user_turn_at"]) * 1000
+            )
+            metadata = artifact.read_metadata()
+            turn_latencies = metadata.get("assistant_text_committed_latency_ms", [])
+            turn_latencies.append(latency_ms)
+            artifact.update_metadata(assistant_text_committed_latency_ms=turn_latencies)
+
+    @session.on("close")
+    def on_session_close(_event) -> None:
+        finished.set()
+
+    # Explicit SIP participant selection needs a connected local participant.
+    # The older browser-only rehearsal happened to work with the reverse order.
     await ctx.connect()
+
+    if dispatch_metadata.get("call_type") == "authorized_assessment":
+        await session.start(
+            agent=PatientSimulator(),
+            room=ctx.room,
+            room_options=room_io.RoomOptions(participant_identity="assessment-support-agent"),
+        )
+    else:
+        await session.start(agent=PatientSimulator(), room=ctx.room)
 
     timeout_task = asyncio.create_task(
         asyncio.sleep(controls["maximum_call_seconds"])
     )
     try:
-        await session.say(
-            "Hi, I have had knee pain after running and wanted to ask about an appointment.",
-            allow_interruptions=True,
+        try:
+            await asyncio.wait_for(first_support_turn.wait(), timeout=8)
+        except asyncio.TimeoutError:
+            await session.say(
+                "Hello, I’m calling about recurring knee pain and wanted to ask about an appointment.",
+                allow_interruptions=True,
+            )
+        finished_task = asyncio.create_task(finished.wait())
+        done, _ = await asyncio.wait(
+            {timeout_task, finished_task},
+            return_when=asyncio.FIRST_COMPLETED,
         )
-        await timeout_task
-        await end_rehearsal("I’m sorry, I need to go now. Goodbye.")
+        if timeout_task in done and not state["ending"]:
+            await end_rehearsal("I’m sorry, I need to go now. Goodbye.")
+        finished_task.cancel()
     finally:
         timeout_task.cancel()
+        if artifact is not None:
+            artifact.update_metadata(
+                ended_at=now_iso(),
+                status="completed",
+                final_user_turns=state["turns"],
+            )
+        if debug_capture is not None:
+            debug_capture.close()
 
 
 if __name__ == "__main__":

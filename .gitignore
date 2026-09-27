@@ -21,3 +21,7 @@ artifacts/reports/*
 .pytest_cache/
 .coverage
 htmlcov/
+
+
+
+artifacts/
